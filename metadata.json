@@ -1,5 +1,5 @@
 {
   "name": "Field Tech",
-  "description": "Mobile-first IT field technician collaboration and deployment platform.",
+  "description": "Mobile-first field technician collaboration and deployment platform.",
   "requestFramePermissions": ["camera", "geolocation"]
 }

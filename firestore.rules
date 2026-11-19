@@ -1,0 +1,290 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ==========================================
+    // 0. GLOBAL SAFETY NET
+    // ==========================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ==========================================
+    // PHASE 3: PRIMITIVE DEFINITIONS
+    // ==========================================
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // AUTH TOKENS NEVER CONTAIN ROLES. MUST LOOK UP.
+    // Memoized get() for the current user's profile
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isOrgMember(orgCode) {
+      return isSignedIn() && getUserData().orgCode == orgCode;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        getUserData().role in ['manager', 'dispatcher'] || 
+        (request.auth.token.email == "ykudjawu@gmail.com" && request.auth.token.email_verified == true)
+      );
+    }
+
+    // ==========================================
+    // PHASE 4: VALIDATION BLUEPRINTS
+    // ==========================================
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'role', 'orgCode']) &&
+             data.keys().size() >= 4 &&
+             data.uid is string && data.uid.size() <= 128 &&
+             data.email is string && data.email.size() <= 256 &&
+             data.role in ['technician', 'dispatcher', 'manager'] &&
+             data.orgCode is string && data.orgCode.size() <= 32 &&
+             (!('trade' in data) || (data.trade is string && data.trade.size() <= 40)) &&
+             (!('skills' in data) || (data.skills is list && data.skills.size() <= 30));
+    }
+
+    function isValidTicket(data) {
+      return data.keys().hasAll(['title', 'status', 'priority', 'siteId', 'orgCode']) &&
+             data.title is string && data.title.size() <= 200 &&
+             data.status in ['open', 'in-progress', 'resolved', 'closed'] &&
+             data.priority in ['low', 'medium', 'high', 'critical'] &&
+             data.siteId is string && data.siteId.size() <= 128 &&
+             data.orgCode is string && data.orgCode.size() <= 32 &&
+             (!('trade' in data) || (data.trade is string && data.trade.size() <= 40)) &&
+             (!('category' in data) || (data.category is string && data.category.size() <= 80)) &&
+             (!('permitRequired' in data) || data.permitRequired is bool) &&
+             (!('materials' in data) || (data.materials is list && data.materials.size() <= 50)) &&
+             (!('assetId' in data) || data.assetId == null || (data.assetId is string && data.assetId.size() <= 128));
+    }
+
+    function isValidAsset(data) {
+      return data.keys().hasAll(['name', 'type', 'siteId', 'orgCode', 'status']) &&
+             data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
+             data.type is string && data.type.size() >= 1 && data.type.size() <= 80 &&
+             data.siteId is string && data.siteId.size() <= 128 &&
+             data.orgCode is string && data.orgCode.size() <= 32 &&
+             data.status in ['operational', 'needs-service', 'out-of-service', 'retired'] &&
+             (!('trade' in data) || (data.trade is string && data.trade.size() <= 40)) &&
+             (!('assetTag' in data) || (data.assetTag is string && data.assetTag.size() <= 64)) &&
+             (!('qrCode' in data) || (data.qrCode is string && data.qrCode.size() <= 256)) &&
+             (!('locationId' in data) || (data.locationId is string && data.locationId.size() <= 120)) &&
+             (!('manufacturer' in data) || (data.manufacturer is string && data.manufacturer.size() <= 100)) &&
+             (!('model' in data) || (data.model is string && data.model.size() <= 100)) &&
+             (!('serialNumber' in data) || (data.serialNumber is string && data.serialNumber.size() <= 100)) &&
+             (!('linkedTicketId' in data) || data.linkedTicketId == null || (data.linkedTicketId is string && data.linkedTicketId.size() <= 128)) &&
+             (!('lastServicedAt' in data) || data.lastServicedAt == null || (data.lastServicedAt is string && data.lastServicedAt.size() <= 64)) &&
+             (!('nextServiceDue' in data) || data.nextServiceDue == null || (data.nextServiceDue is string && data.nextServiceDue.size() <= 64)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000)) &&
+             (!('createdBy' in data) || (data.createdBy is string && data.createdBy.size() <= 128));
+    }
+
+    function isValidTimeEntry(data) {
+      return data.keys().hasAll(['userId', 'orgCode', 'clockIn', 'status']) &&
+             data.userId == request.auth.uid &&
+             data.orgCode is string &&
+             data.status in ['active', 'completed'];
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['text', 'senderId', 'channelId', 'orgCode']) &&
+             data.text is string && data.text.size() <= 5000 &&
+             data.senderId == request.auth.uid;
+    }
+
+    function isValidChannel(data) {
+      return data.keys().hasAll(['name', 'type', 'orgCode', 'createdBy']) &&
+             data.name is string && data.name.size() <= 50 &&
+             data.type in ['public', 'private'] &&
+             data.orgCode is string &&
+             data.createdBy == request.auth.uid;
+    }
+
+    function isValidSite(data) {
+      return data.keys().hasAll(['name', 'address', 'orgCode']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.address is string && data.address.size() <= 300 &&
+             data.orgCode is string;
+    }
+
+    function isValidTask(data) {
+      return data.keys().hasAll(['title', 'status', 'assignedTo', 'orgCode', 'createdBy']) &&
+             data.title is string && data.title.size() <= 200 &&
+             data.status in ['pending', 'completed'] &&
+             data.orgCode is string && data.orgCode.size() <= 32 &&
+             data.assignedTo is string && data.assignedTo.size() <= 128 &&
+             data.createdBy == request.auth.uid &&
+             (!('trade' in data) || (data.trade is string && data.trade.size() <= 40));
+    }
+
+    function canAccessChannel(channelId) {
+      let channel = get(/databases/$(database)/documents/channels/$(channelId)).data;
+      return isOrgMember(channel.orgCode) && (
+        channel.type == 'public' || 
+        (isSignedIn() && request.auth.uid in channel.memberIds)
+      );
+    }
+
+    // ==========================================
+    // RESOURCE MATCH BLOCKS
+    // ==========================================
+
+    // Users
+    match /users/{uid} {
+      // Allow read if profile owner or same org member
+      allow get: if isSignedIn() && (isOwner(uid) || isOrgMember(existing().orgCode));
+      
+      // Allow listing if member of ORG or searching for OWN email (onboarding)
+      allow list: if isSignedIn() && (
+        isOrgMember(resource.data.orgCode) || 
+        resource.data.email == request.auth.token.email
+      );
+      
+      allow create: if isOwner(uid) && 
+                      isValidUser(incoming()) && 
+                      incoming().role == 'technician' && 
+                      incoming().orgCode == 'DEFAULT';
+      
+      allow update: if isSignedIn() && (isOwner(uid) || isAdmin()) && (
+        // Case 1: Existing member or Admin (Restrict role/org change)
+        (existing().orgCode != 'DEFAULT' && !isAdmin() && 
+         incoming().role == existing().role &&
+         incoming().orgCode == existing().orgCode &&
+         incoming().uid == existing().uid) ||
+        // Case 2: Onboarding (Allow changing from DEFAULT)
+        (isOwner(uid) && existing().orgCode == 'DEFAULT') ||
+        // Case 3: Admin override
+        isAdmin()
+      );
+    }
+
+    // Tickets
+    match /tickets/{ticketId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgCode);
+      allow create: if isSignedIn() && isOrgMember(incoming().orgCode) && isValidTicket(incoming());
+      allow update: if isSignedIn() && isOrgMember(existing().orgCode) && isValidTicket(incoming()) && (
+        isAdmin() ||
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'assignedTo', 'updatedAt', 'materials'])
+      );
+      allow delete: if isAdmin() && isOrgMember(existing().orgCode);
+    }
+
+    // TimeEntries (The Clock)
+    match /timeEntries/{entryId} {
+      // Optimized read: owner check first as it doesn't require get()
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        (isAdmin() && isOrgMember(resource.data.orgCode))
+      );
+      
+      allow create: if isSignedIn() && isValidTimeEntry(incoming()) && isOrgMember(incoming().orgCode);
+      
+      allow update: if isSignedIn() && 
+                      isOwner(existing().userId) && 
+                      isValidTimeEntry(incoming()) &&
+                      incoming().userId == existing().userId &&
+                      incoming().clockIn == existing().clockIn &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['clockOut', 'status']);
+    }
+
+    // Messages
+    match /messages/{messageId} {
+      allow list: if isSignedIn() && isOrgMember(resource.data.orgCode);
+      allow get: if isSignedIn() && canAccessChannel(resource.data.channelId);
+      allow create: if isSignedIn() && isOrgMember(incoming().orgCode) && 
+                      isValidMessage(incoming()) && 
+                      canAccessChannel(incoming().channelId);
+    }
+
+    // Channels
+    match /channels/{channelId} {
+      allow read: if isSignedIn() && (
+        resource.data.type == 'public' && isOrgMember(resource.data.orgCode) ||
+        (isSignedIn() && request.auth.uid in resource.data.memberIds)
+      );
+      allow create: if isAdmin() && isOrgMember(incoming().orgCode) && isValidChannel(incoming());
+      allow update: if isSignedIn() && (
+        isAdmin() && isOrgMember(existing().orgCode) ||
+        (isOrgMember(existing().orgCode) && existing().type == 'public' && incoming().diff(existing()).affectedKeys().hasOnly(['memberIds']))
+      );
+      allow delete: if isAdmin() && isOrgMember(existing().orgCode);
+    }
+
+    // Assets
+    match /assets/{assetId} {
+      allow get: if isSignedIn() && isValidId(assetId) && isOrgMember(resource.data.orgCode);
+      allow list: if isSignedIn() && isOrgMember(resource.data.orgCode);
+      allow create: if isSignedIn() && isValidId(assetId) && isValidAsset(incoming()) && isOrgMember(incoming().orgCode);
+      allow update: if isSignedIn() && isValidId(assetId) && isOrgMember(existing().orgCode) && isValidAsset(incoming()) &&
+                      incoming().orgCode == existing().orgCode && (
+                        isAdmin() ||
+                        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'linkedTicketId', 'lastServicedAt', 'notes', 'updatedAt'])
+                      );
+      allow delete: if isAdmin() && isValidId(assetId) && isOrgMember(existing().orgCode);
+    }
+
+    // WorkLogs
+    match /workLogs/{logId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgCode);
+      allow create: if isSignedIn() && isOrgMember(incoming().orgCode);
+    }
+
+    // Floorplans
+    match /floorplans/{floorplanId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgCode);
+      allow create: if isAdmin() && isOrgMember(incoming().orgCode);
+      allow update, delete: if isAdmin() && isOrgMember(existing().orgCode);
+    }
+
+    // Invites
+    match /invites/{inviteId} {
+      allow read: if isSignedIn() && (
+        isOrgMember(resource.data.orgCode) || 
+        resource.data.email == request.auth.token.email
+      );
+      allow create: if isAdmin() && isOrgMember(incoming().orgCode);
+      allow update, delete: if isAdmin() && isOrgMember(existing().orgCode);
+    }
+
+    // Sites
+    match /sites/{siteId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgCode);
+      allow create: if isAdmin() && isOrgMember(incoming().orgCode) && isValidSite(incoming());
+      allow update: if isAdmin() && isOrgMember(existing().orgCode) && 
+                      isValidSite(incoming()) && 
+                      incoming().orgCode == existing().orgCode;
+      allow delete: if isAdmin() && isOrgMember(existing().orgCode);
+    }
+
+    // Tasks
+    match /tasks/{taskId} {
+      allow read: if isSignedIn() && isOrgMember(resource.data.orgCode);
+      allow create: if isAdmin() && isOrgMember(incoming().orgCode) && isValidTask(incoming());
+      allow update: if isSignedIn() && isOrgMember(existing().orgCode) && (
+        (isAdmin() && isValidTask(incoming())) ||
+        (isOwner(existing().assignedTo) && incoming().diff(existing()).affectedKeys().hasOnly(['status']))
+      );
+      allow delete: if isAdmin() && isOrgMember(existing().orgCode);
+    }
+  }
+}

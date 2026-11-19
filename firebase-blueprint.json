@@ -1,0 +1,217 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System user with role-based access.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "orgCode": { "type": "string" },
+        "role": { "type": "string", "enum": ["technician", "dispatcher", "manager"] },
+        "trade": { "type": "string", "maxLength": 40 },
+        "skills": { "type": "array", "items": { "type": "string" } },
+        "location": { "type": "object", "properties": { "lat": { "type": "number" }, "lng": { "type": "number" } } },
+        "lastActive": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role", "orgCode"]
+    },
+    "Ticket": {
+      "title": "Ticket",
+      "description": "Multi-trade field service work order and ticket.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orgCode": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "in-progress", "resolved", "closed"] },
+        "priority": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+        "trade": { "type": "string", "maxLength": 40 },
+        "category": { "type": "string", "maxLength": 80 },
+        "siteId": { "type": "string" },
+        "assignedTo": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "slaDeadline": { "type": "string", "format": "date-time" },
+        "permitRequired": { "type": "boolean" },
+        "materials": { "type": "array" },
+        "assetId": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["title", "status", "priority", "siteId", "orgCode"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Real-time chat message.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orgCode": { "type": "string" },
+        "text": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "channelId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["text", "senderId", "channelId", "orgCode"]
+    },
+    "Asset": {
+      "title": "Asset",
+      "description": "QR-tagged field equipment and hardware asset.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orgCode": { "type": "string", "maxLength": 32 },
+        "name": { "type": "string", "maxLength": 120 },
+        "assetTag": { "type": "string", "maxLength": 64 },
+        "qrCode": { "type": "string", "maxLength": 256 },
+        "type": { "type": "string", "maxLength": 80 },
+        "trade": { "type": "string", "maxLength": 40 },
+        "siteId": { "type": "string", "maxLength": 128 },
+        "locationId": { "type": "string", "maxLength": 120 },
+        "manufacturer": { "type": "string", "maxLength": 100 },
+        "model": { "type": "string", "maxLength": 100 },
+        "serialNumber": { "type": "string", "maxLength": 100 },
+        "status": { "type": "string", "enum": ["operational", "needs-service", "out-of-service", "retired"] },
+        "linkedTicketId": { "type": "string", "maxLength": 128 },
+        "lastServicedAt": { "type": "string", "maxLength": 64 },
+        "nextServiceDue": { "type": "string", "maxLength": 64 },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "createdBy": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "type", "siteId", "orgCode", "status"]
+    },
+    "WorkLog": {
+      "title": "WorkLog",
+      "description": "Technician work log entry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orgCode": { "type": "string" },
+        "ticketId": { "type": "string" },
+        "technicianId": { "type": "string" },
+        "comment": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ticketId", "technicianId", "comment", "orgCode"]
+    },
+    "TimeEntry": {
+      "title": "TimeEntry",
+      "description": "Clock in/out record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orgCode": { "type": "string" },
+        "userId": { "type": "string" },
+        "clockIn": { "type": "string", "format": "date-time" },
+        "clockOut": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["active", "completed"] }
+      },
+      "required": ["userId", "orgCode", "clockIn", "status"]
+    },
+    "Invite": {
+      "title": "Invite",
+      "description": "Technician invitation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orgCode": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "trade": { "type": "string", "maxLength": 40 },
+        "status": { "type": "string", "enum": ["pending", "accepted"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role", "status", "orgCode"]
+    },
+    "Floorplan": {
+      "title": "Floorplan",
+      "description": "Site floorplan metadata.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orgCode": { "type": "string" },
+        "siteId": { "type": "string" },
+        "url": { "type": "string" },
+        "name": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteId", "url", "name", "orgCode"]
+    },
+    "Site": {
+      "title": "Site",
+      "description": "Physical location for field service.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orgCode": { "type": "string" },
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "location": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" }
+          }
+        },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "address", "orgCode"]
+    },
+    "Channel": {
+      "title": "Channel",
+      "description": "Chat channel or room.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orgCode": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["public", "private"] },
+        "memberIds": { "type": "array", "items": { "type": "string" } },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "type", "orgCode", "createdBy"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "A specific task for a technician.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orgCode": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "completed"] },
+        "trade": { "type": "string", "maxLength": 40 },
+        "assignedTo": { "type": "string" },
+        "ticketId": { "type": "string" },
+        "siteId": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "status", "assignedTo", "orgCode", "createdBy"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": { "schema": "User", "description": "User profiles" },
+    "/tickets/{ticketId}": { "schema": "Ticket", "description": "Ticketing system" },
+    "/messages/{messageId}": { "schema": "Message", "description": "Global/Ticket chat" },
+    "/channels/{channelId}": { "schema": "Channel", "description": "Chat channels" },
+    "/assets/{assetId}": { "schema": "Asset", "description": "Asset inventory" },
+    "/workLogs/{logId}": { "schema": "WorkLog", "description": "Work logs for tickets" },
+    "/timeEntries/{entryId}": { "schema": "TimeEntry", "description": "Clock in/out tracking" },
+    "/invites/{inviteId}": { "schema": "Invite", "description": "Manager invites" },
+    "/sites/{siteId}": { "schema": "Site", "description": "Service sites" },
+    "/floorplans/{floorplanId}": { "schema": "Floorplan", "description": "Floorplans for sites" },
+    "/tasks/{taskId}": { "schema": "Task", "description": "Technician tasks" }
+  }
+}
